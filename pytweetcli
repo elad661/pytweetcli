@@ -1,0 +1,132 @@
+#! /bin/env python
+# coding=utf8
+#
+# pytweetcli - a CLI twitter client
+#
+#╔════════════════════════════════════════════════════════════════════════════╗
+#║ Copyright © 2013, Elad Alfassa <elad@fedoraproject.org>                    ║
+#║                                                                            ║
+#║   This program is free software: you can redistribute it and/or modify     ║
+#║   it under the terms of the GNU General Public License as published by     ║
+#║   the Free Software Foundation, either version 3 of the License, or        ║
+#║   (at your option) any later version.                                      ║
+#║                                                                            ║
+#║   This program is distributed in the hope that it will be useful,          ║
+#║   but WITHOUT ANY WARRANTY; without even the implied warranty of           ║
+#║   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the            ║
+#║   GNU General Public License for more details.                             ║
+#║                                                                            ║
+#║   You should have received a copy of the GNU General Public License        ║
+#║   along with this program.  If not, see <http://www.gnu.org/licenses/>.    ║
+#║                                                                            ║
+#╚════════════════════════════════════════════════════════════════════════════╝
+
+from __future__ import print_function
+import tweepy
+import ConfigParser
+import os
+import os.path
+import webbrowser
+import sys
+import optparse
+
+config_file = os.path.expanduser('~/.config/pytweetcli.conf')
+
+def main(argv=None):
+    #Set up option parser
+    parser = optparse.OptionParser('%prog [options]')
+    parser.add_option('-f', '--feed', action="store_true", dest="feed",
+            help='Show latest tweets from your feed')
+    parser.add_option('-m', '--mentions', action="store_true", dest="mentions",
+            help='Show 20 latest mentions')
+    parser.add_option('-i', '--stdin', action="store_true", dest="stdin",
+            help='Read tweet from stdin')
+    parser.add_option('-s', '--strip', action="store_true", dest="strip",
+            help='If tweet is too long, strip everything after char 140')
+    parser.add_option('-x', '--split', action="store_true", dest="split",
+            help='If tweet is too long, split it to more than one')
+    opts, args = parser.parse_args(argv)
+    
+    #Check if ~/.config exists and create it if needed
+    if not os.path.isdir(os.path.dirname(config_file)):
+        os.path.makedirs(os.path.dirname(config_file))
+
+    config = ConfigParser.ConfigParser()
+    config.read(config_file)
+    if not config.has_section('pytweetcli') or not config.has_option('pytweetcli', 'consumer_key') or not config.has_option('pytweetcli', 'consumer_secret'):
+        print('You\'ll need to get a consumer key and a consumer secret from https://dev.twitter.com/apps')
+        key = raw_input('Enter twitter consumer key: ')
+        secret = raw_input('Enter twitter consumer secret: ')
+        if not config.has_section('pytweetcli'):
+            config.add_section('pytweetcli')
+        config.set('pytweetcli', 'consumer_key', key)
+        config.set('pytweetcli', 'consumer_secret', secret)
+        config_file_object = open(config_file, 'w')
+        config.write(config_file_object)
+        config_file_object.close()
+    consumer_key = config.get('pytweetcli', 'consumer_key')
+    consumer_secret = config.get('pytweetcli', 'consumer_secret')
+
+    # Start authentication process
+    auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
+    if config.has_option('pytweetcli','token') and config.has_option('pytweetcli','token_secret'):
+        auth.set_access_token(access_token, access_token_secret)
+    else:
+        print("Please authenticate with twitter: [opening web browser]")
+        webbrowser.open(auth.get_authorization_url())
+        code = raw_input('Enter authentication code from twitter: ').strip()
+        token = auth.get_access_token(verifier=code)
+        config.set('pytweetcli', 'token', token.key)
+        config.set('pytweetcli', 'token_secret', token.secret)
+        config_file_object = open(config_file, 'w')
+        config.write(config_file_object)
+        config_file_object.close()
+
+    api = tweepy.API(auth)
+    tweet = ""
+
+    if not opts.feed and not opts.mentions:
+        if not opts.stdin:
+            print('Enter tweet below:')
+            try_again = True
+            while try_again:
+                tweet = raw_input()
+                if len(tweet)>140:
+                    print('Tweet too long, try again:')
+                else:
+                    try_again = False
+            status = api.update_status(tweet)
+            print ('tweeted!')
+            print ('\tID:\t%s' % status.id)
+        else:
+            tweet = sys.stdin.read()
+            if len(tweet)>140:
+                if opts.split:
+                    print('Splitting is not implemented yet') #TODO
+                    sys.exit(1)
+                if not opts.strip:
+                    print ('tweet too long!')
+                    sys.exit(1)
+                else:
+                    tweet = tweet[:140]
+                    print ('Your tweet:\n%s' % tweet)
+            status = api.update_status(tweet)
+            print ('tweeted!')
+            print ('\tID:\t%s' % status.id)
+    else:
+        i = 0
+        if opts.feed:
+            timeline = api.home_timeline()
+        else:
+            timeline = api.mentions()
+        for tweet in timeline:
+            if term.LINES is not None and i*2 >= os.environ('LINES')-2:
+                break
+            verified = ''
+            if tweet.author.verified:
+                verified = '*'
+            print ('%s (@%s)%s:' % (tweet.author.name.encode('utf-8'), tweet.author.screen_name.encode('utf-8'), verified))
+            print ('\t%s' % tweet.text.encode('utf-8'))
+            i=i+1
+if __name__ == '__main__':
+    main()
