@@ -29,9 +29,26 @@ import os.path
 import webbrowser
 import sys
 import curses
+from htmlentitydefs import name2codepoint
+import re
 import optparse
 
 config_file = os.path.expanduser('~/.config/pytweetcli.conf')
+
+def parse_sgml_entities(text):
+    ''' Parses HTML entities in the tweet '''
+    match = re.findall('(&[A-z]+;)+', text)
+    for word in match:
+        name=word[1:-1]
+        try:
+            text = text.replace(word, unichr(name2codepoint[name]))
+        except:
+            pass
+    match = re.findall('(&#[0-9]+;)+', text)
+    for word in match:
+        codepoint = int(word[2:-1])
+        text = text.replace(word, unichr(codepoint))
+    return text
 
 def main(argv=None):
     #Set up option parser
@@ -131,7 +148,8 @@ def main(argv=None):
             if tweet.author.verified:
                 verified = '*'
             print ('%s (@%s)%s:' % (tweet.author.name.encode('utf-8'), tweet.author.screen_name.encode('utf-8'), verified))
-            print ('\t%s' % tweet.text.encode('utf-8'))
+            print ('\t%s' % parse_sgml_entities(tweet.text).encode('utf-8'))
             i=i+1
+
 if __name__ == '__main__':
     main()
