@@ -70,7 +70,7 @@ def main(argv=None):
     # Start authentication process
     auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
     if config.has_option('pytweetcli','token') and config.has_option('pytweetcli','token_secret'):
-        auth.set_access_token(access_token, access_token_secret)
+        auth.set_access_token(config.get('pytweetcli','token'), config.get('pytweetcli','token_secret'))
     else:
         print("Please authenticate with twitter: [opening web browser]")
         webbrowser.open(auth.get_authorization_url())
