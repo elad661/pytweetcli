@@ -28,6 +28,7 @@ import os
 import os.path
 import webbrowser
 import sys
+import curses
 import optparse
 
 config_file = os.path.expanduser('~/.config/pytweetcli.conf')
@@ -119,8 +120,12 @@ def main(argv=None):
             timeline = api.home_timeline()
         else:
             timeline = api.mentions()
+        lines = None
+        if sys.stdout.isatty():
+            curses.setupterm()
+            lines = curses.tigetnum('lines') 
         for tweet in timeline:
-            if term.LINES is not None and i*2 >= os.environ('LINES')-2:
+            if lines is not None and i*2 >= lines-2:
                 break
             verified = ''
             if tweet.author.verified:
